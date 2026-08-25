@@ -196,7 +196,7 @@ async function sendWorkoutsEmail() {
   if (!confirm(`Send all ${workouts.length} workout(s) to ${email}?`)) return;
 
   try {
-    const res = await fetch("/api/send-email", {
+    const res = await fetch("https://emailing.rogerdtinsley.workers.dev", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, workouts })
