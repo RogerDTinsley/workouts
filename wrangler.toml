@@ -1,11 +1,12 @@
 name = "emailing"
-compatibility_date = "2026-08-20"
+main = "src/index.js"
+compatibility_date = "2026-08-26"
 
 
 [assets]
 directory = "./public"
 # Optional – uncomment only if you have real Worker logic that needs the assets binding:
-# binding = "ASSETS"
+binding = "ASSETS"
 # not_found_handling = "single-page-application"
 
 [observability]
