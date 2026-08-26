@@ -1,16 +1,14 @@
 const COOKIE_NAME = "workouts";
-const EMAIL_COOKIE = "userEmail";
 const tbody = document.getElementById("workout-tbody");
 const emailSection = document.getElementById("email-section");
 
 let workouts = [];
+let registeredEmail = "";
 
-// Generate unique ID
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
-// Cookie helpers
 function getCookie(name) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
@@ -26,40 +24,52 @@ function setCookie(name, value, days = 365) {
 }
 
 function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
+function persistCookie() {
+  setCookie(COOKIE_NAME, JSON.stringify({
+    email: registeredEmail || "",
+    workouts
+  }));
 }
 
 function loadWorkouts() {
   const raw = getCookie(COOKIE_NAME);
+  workouts = [];
+  registeredEmail = "";
+
   if (raw) {
     try {
-      workouts = JSON.parse(raw);
-      if (!Array.isArray(workouts)) workouts = [];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        workouts = parsed;
+      } else if (parsed && typeof parsed === "object") {
+        workouts = Array.isArray(parsed.workouts) ? parsed.workouts : [];
+        registeredEmail = parsed.email || "";
+      }
     } catch {
       workouts = [];
     }
-  } else {
-    workouts = [];
   }
-  // Always keep descending date order (then time)
+
   sortWorkouts();
   renderEmailSection();
   renderTable();
 }
 
 function saveWorkouts() {
-  setCookie(COOKIE_NAME, JSON.stringify(workouts));
+  persistCookie();
 }
 
 function sortWorkouts() {
   workouts.sort((a, b) => {
     const da = a.date + "T" + (a.time || "00:00");
     const db = b.date + "T" + (b.time || "00:00");
-    return db.localeCompare(da); // descending
+    return db.localeCompare(da);
   });
 }
 
-// Time options: 05:00 to 23:45 in 15-min increments
 function buildTimeOptions(selected = "") {
   let html = "";
   for (let h = 5; h <= 23; h++) {
@@ -75,18 +85,28 @@ function buildTimeOptions(selected = "") {
 
 function getToday() {
   const d = new Date();
-  return d.toISOString().slice(0, 10);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function getLatestDefaults() {
   if (workouts.length === 0) {
     return { type: "walk", distance: "" };
   }
-  // workouts already sorted descending, so first is latest
   return {
     type: workouts[0].type || "walk",
     distance: workouts[0].distance != null ? workouts[0].distance : ""
   };
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function createInputRow() {
@@ -149,14 +169,13 @@ function collectInputValues(prefix = "new-") {
 }
 
 function renderEmailSection() {
-  const email = getCookie(EMAIL_COOKIE);
   emailSection.innerHTML = "";
 
-  if (email && isValidEmail(email)) {
+  if (isValidEmail(registeredEmail)) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "btn-email";
-    btn.textContent = "Email all workouts";
+    btn.textContent = "Email";
     btn.addEventListener("click", sendWorkoutsEmail);
     emailSection.appendChild(btn);
   } else {
@@ -177,14 +196,50 @@ function registerEmail() {
     alert("Please enter a valid email address.");
     return;
   }
-  setCookie(EMAIL_COOKIE, trimmed);
+  registeredEmail = trimmed;
+  persistCookie();
   renderEmailSection();
   alert("Email registered successfully.");
 }
 
+function buildEmailTableHtml(list) {
+  const rows = list.map((w) => `
+    <tr>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.date)}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.time)}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.type)}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.distance)}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.pace)}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.bp || "")}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${w.temp != null ? escapeHtml(w.temp) : ""}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.weather || "")}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:left;">${escapeHtml(w.comments || "")}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <h1 style="font-family:Arial,sans-serif;color:#ff1493;">Workout Tracker</h1>
+    <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:14px;">
+      <thead>
+        <tr>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Date</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Time</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Type</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Distance (mi)</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Pace (min/mi)</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">BP</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Temp (°F)</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Weather</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Comments</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
 async function sendWorkoutsEmail() {
-  const email = getCookie(EMAIL_COOKIE);
-  if (!email || !isValidEmail(email)) {
+  if (!isValidEmail(registeredEmail)) {
     alert("No valid email registered.");
     renderEmailSection();
     return;
@@ -193,13 +248,18 @@ async function sendWorkoutsEmail() {
     alert("No workouts to email.");
     return;
   }
-  if (!confirm(`Send all ${workouts.length} workout(s) to ${email}?`)) return;
+  if (!confirm(`Send all ${workouts.length} workout(s) to ${registeredEmail}?`)) return;
 
   try {
-    const res = await fetch('/api/send-mail', {
+    const res = await fetch("/api/send-mail", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, workouts })
+      body: JSON.stringify({
+        email: registeredEmail,
+        subject: "Workout Tracker",
+        html: buildEmailTableHtml(workouts),
+        workouts
+      })
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -216,22 +276,16 @@ async function sendWorkoutsEmail() {
 function renderTable() {
   tbody.innerHTML = "";
 
-  // Always first: the new-entry row
   const inputRow = createInputRow();
   tbody.appendChild(inputRow);
 
-  // Wire add buttons
   document.getElementById("btn-add-save").addEventListener("click", () => {
     const data = collectInputValues("new-");
     if (!data.date || !data.time) {
       alert("Date and time are required.");
       return;
     }
-    const workout = {
-      id: generateId(),
-      ...data
-    };
-    workouts.unshift(workout); // add to front
+    workouts.unshift({ id: generateId(), ...data });
     sortWorkouts();
     saveWorkouts();
     renderTable();
@@ -239,7 +293,6 @@ function renderTable() {
 
   document.getElementById("btn-add-cancel").addEventListener("click", clearInputRow);
 
-  // Existing workouts
   if (workouts.length === 0) {
     const emptyTr = document.createElement("tr");
     emptyTr.innerHTML = `<td colspan="10" class="empty-message">No workouts yet. Add your first one above!</td>`;
@@ -251,15 +304,15 @@ function renderTable() {
     const tr = document.createElement("tr");
     tr.dataset.id = w.id;
     tr.innerHTML = `
-      <td class="display">${w.date}</td>
-      <td class="display">${w.time}</td>
-      <td class="display">${w.type}</td>
-      <td class="display">${w.distance}</td>
-      <td class="display">${w.pace}</td>
-      <td class="display">${w.bp || ""}</td>
-      <td class="display">${w.temp != null ? w.temp : ""}</td>
-      <td class="display">${w.weather || ""}</td>
-      <td class="display">${w.comments || ""}</td>
+      <td class="display">${escapeHtml(w.date)}</td>
+      <td class="display">${escapeHtml(w.time)}</td>
+      <td class="display">${escapeHtml(w.type)}</td>
+      <td class="display">${escapeHtml(w.distance)}</td>
+      <td class="display">${escapeHtml(w.pace)}</td>
+      <td class="display">${escapeHtml(w.bp || "")}</td>
+      <td class="display">${w.temp != null ? escapeHtml(w.temp) : ""}</td>
+      <td class="display">${escapeHtml(w.weather || "")}</td>
+      <td class="display">${escapeHtml(w.comments || "")}</td>
       <td>
         <button type="button" class="btn-edit">Edit</button>
         <button type="button" class="btn-delete">Delete</button>
@@ -267,11 +320,8 @@ function renderTable() {
     `;
     tbody.appendChild(tr);
 
-    const editBtn = tr.querySelector(".btn-edit");
-    const deleteBtn = tr.querySelector(".btn-delete");
-
-    editBtn.addEventListener("click", () => startInlineEdit(tr, w));
-    deleteBtn.addEventListener("click", () => {
+    tr.querySelector(".btn-edit").addEventListener("click", () => startInlineEdit(tr, w));
+    tr.querySelector(".btn-delete").addEventListener("click", () => {
       if (!confirm("Delete this workout?")) return;
       workouts = workouts.filter((item) => item.id !== w.id);
       saveWorkouts();
@@ -283,7 +333,7 @@ function renderTable() {
 function startInlineEdit(tr, w) {
   tr.classList.add("editing");
   tr.innerHTML = `
-    <td><input type="date" class="edit-date" value="${w.date}"></td>
+    <td><input type="date" class="edit-date" value="${escapeHtml(w.date)}"></td>
     <td><select class="edit-time">${buildTimeOptions(w.time)}</select></td>
     <td>
       <select class="edit-type">
@@ -296,20 +346,17 @@ function startInlineEdit(tr, w) {
     </td>
     <td><input type="number" class="edit-distance" step="0.01" min="0" value="${w.distance}"></td>
     <td><input type="number" class="edit-pace" step="0.1" min="0" value="${w.pace}"></td>
-    <td><input type="text" class="edit-bp" value="${w.bp || ""}" placeholder="120/80"></td>
+    <td><input type="text" class="edit-bp" value="${escapeHtml(w.bp || "")}" placeholder="120/80"></td>
     <td><input type="number" class="edit-temp" step="1" value="${w.temp != null ? w.temp : ""}"></td>
-    <td><input type="text" class="edit-weather" value="${w.weather || ""}"></td>
-    <td><textarea class="edit-comments" rows="1">${w.comments || ""}</textarea></td>
+    <td><input type="text" class="edit-weather" value="${escapeHtml(w.weather || "")}"></td>
+    <td><textarea class="edit-comments" rows="1">${escapeHtml(w.comments || "")}</textarea></td>
     <td>
       <button type="button" class="btn-save">Save</button>
       <button type="button" class="btn-cancel">Cancel</button>
     </td>
   `;
 
-  const saveBtn = tr.querySelector(".btn-save");
-  const cancelBtn = tr.querySelector(".btn-cancel");
-
-  saveBtn.addEventListener("click", () => {
+  tr.querySelector(".btn-save").addEventListener("click", () => {
     const updated = {
       id: w.id,
       date: tr.querySelector(".edit-date").value,
@@ -325,13 +372,11 @@ function startInlineEdit(tr, w) {
       comments: tr.querySelector(".edit-comments").value.trim()
     };
 
-    // Basic validation
     if (!updated.date || !updated.time) {
       alert("Date and time are required.");
       return;
     }
 
-    // Update the workout in the array
     const idx = workouts.findIndex((item) => item.id === w.id);
     if (idx !== -1) {
       workouts[idx] = updated;
@@ -341,8 +386,8 @@ function startInlineEdit(tr, w) {
     }
   });
 
-  cancelBtn.addEventListener("click", () => {
-    renderTable(); // simply re-render to exit edit mode
+  tr.querySelector(".btn-cancel").addEventListener("click", () => {
+    renderTable();
   });
 }
 
