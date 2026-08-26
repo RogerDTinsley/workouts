@@ -36,6 +36,14 @@ h1 {
   text-align: center;
 }
 
+.email-section {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -157,6 +165,26 @@ button {
 
 .btn-delete:hover {
   background: #c71585;
+}
+
+.btn-register {
+  background: #20b2aa;
+  color: white;
+}
+
+.btn-register:hover {
+  background: #008b8b;
+  transform: translateY(-1px);
+}
+
+.btn-email {
+  background: #ff69b4;
+  color: white;
+}
+
+.btn-email:hover {
+  background: #ff1493;
+  transform: translateY(-1px);
 }
 
 .empty-message {
