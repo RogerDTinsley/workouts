@@ -7,8 +7,9 @@ directory = "./public"
 # Optional – uncomment only if you have real Worker logic that needs the assets binding:
 # binding = "ASSETS"
 # not_found_handling = "single-page-application"
+
 [observability]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 redact_query_string = false
 
@@ -19,6 +20,6 @@ persist = true
 invocation_logs = true
 
 [observability.traces]
-enabled = false
+enabled = true
 persist = true
 head_sampling_rate = 1
